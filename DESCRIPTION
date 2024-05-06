@@ -1,6 +1,6 @@
 Package: rsocialwatcher
 Title: 'Facebook Marketing API' Social Watcher
-Version: 0.1.0
+Version: 0.1.1
 Authors@R: 
     person("Robert", "Marty", , "rmarty@worldbank.org", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-3164-3813"))
@@ -14,8 +14,8 @@ Suggests: knitr, rmarkdown
 Imports: dplyr, lubridate, jsonlite, httr, curl, stringr,
         splitstackshape, sf, purrr
 NeedsCompilation: no
-Packaged: 2024-05-01 01:26:08 UTC; robmarty
+Packaged: 2024-05-06 17:03:32 UTC; robmarty
 Author: Robert Marty [aut, cre] (<https://orcid.org/0000-0002-3164-3813>)
 Maintainer: Robert Marty <rmarty@worldbank.org>
 Repository: CRAN
-Date/Publication: 2024-05-02 13:10:02 UTC
+Date/Publication: 2024-05-06 18:30:02 UTC

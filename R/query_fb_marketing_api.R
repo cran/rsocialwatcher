@@ -120,9 +120,16 @@ rm_blank <- function(x){
   x[x != ""]
 }
 
-add_comma_if_not_blank <- function(x){
-  if(x != ""){
-    x <- paste0(x, ",")
+add_comma_if_not_blank <- function(x, sep_param_type_and){
+  if(sep_param_type_and){
+    if(x != ""){
+      x <- paste0(x, "},{")
+    }
+  } else{
+    # Or condition
+    if(x != ""){
+      x <- paste0(x, ",")
+    }
   }
   
   return(x)
@@ -141,7 +148,8 @@ make_flex_spec_or <- function(param,
 }
 
 make_flex_spec <- function(param, 
-                           name){
+                           name,
+                           sep_param_type_and = TRUE){
   
   #add_id <- F # ?? Needed ??
   if(name == "interests")             add_id <- T
@@ -176,8 +184,8 @@ make_flex_spec <- function(param,
   
   out <- lapply(param, make_flex_spec_or, name, add_id) %>% 
     rm_blank() %>% 
-    paste(collapse = ",") %>%
-    add_comma_if_not_blank()
+    paste(collapse = "},{") %>%
+    add_comma_if_not_blank(sep_param_type_and)
   
   return(out)
 }
@@ -592,7 +600,8 @@ query_fb_marketing_api_1call <- function(location_unit_type,
         flex_target_ii <- flex_target_i[i]
         
         make_flex_spec(flex_target_ii, 
-                       names(flex_target_ii))
+                       names(flex_target_ii),
+                       sep_param_type_and = FALSE) # Separate diff param types by OR condition
       }) %>%
         paste0(collapse = "") %>%
         str_replace_all(",$", "")
@@ -646,6 +655,9 @@ query_fb_marketing_api_1call <- function(location_unit_type,
   #### Add ending curly bracket ####
   query <- query_all %>% paste0("}")
   
+  #### Remove unneeded brackets ####
+  query <- query %>% str_replace_all(",\\{\\}", "")
+  
   # Make Query -----------------------------------------------------------------
   # Make query and prep dataframe with results and parameter
   try_api_call <- TRUE
@@ -655,7 +667,11 @@ query_fb_marketing_api_1call <- function(location_unit_type,
     
     query_val_df <- tryCatch({
       
-      query_val <- url(query) %>% fromJSON
+      #query_val <- url(query) %>% fromJSON
+      
+      query_val <- GET(query) %>%
+        content(as="text") %>%
+        fromJSON() 
       
       if(!is.null(query_val$error)){
         warning("Error message from 'Facebook Marketing' API")
@@ -806,19 +822,26 @@ query_fb_marketing_api_1call <- function(location_unit_type,
 #' Query 'Facebook Marketing' API
 #' 
 #' @param location_unit_type Either `"coordinates"` (for buffer around single point) or type of geographic location, including: `"countries"`, `"regions"`, `"cities"`, `"zips"`, `"places"`, `"geo_markets"`, `"electoral_district"`, or `"country_groups"`. See the [Basic Targetting](https://developers.facebook.com/docs/marketing-api/audiences/reference/basic-targeting#location) documentation for more information. 
-#' @section If location_unit_type is "coordinates"
+#' ## ------------------------------
+#' __If location_unit_type is "coordinates"__
 #' @param lat_lon Coordinates, c(lat, lon). For example, `c(38.90, -77.01)`
 #' @param radius Radius around coordinate
 #' @param radius_unit Unit for radius; either `"kilometer"` or `"mile"`
-#' @section If location_unit_type is not "coordinates"
+#'
+#' ## ------------------------------
+#' __If location_unit_type is not "coordinates"__
 #' @param location_keys Key associated with location. Use the `get_fb_parameter_ids` function to get location keys; see [here](https://worldbank.github.io/rsocialwatcher/articles/rsocialwatcher-vignette.html#location-ids) for examples.
-#' @section Other location parameters
+#'
+#' ## ------------------------------
+#' __Other location parameters__
 #' @param location_types Either: (1) `"home"` (people whose stated location in Facebook profile "current city" is in an area, valided by IP), (2) `"recent"` (people whose recent location is in the selected area, determined by mobile device data), (3) `"travel_in"` (people whose most recent location is in selected area and more than 100 miles from stated current city), (4) `c("home", "recent")` (for people in either category)
 #' @param locales Locales ID. For more information on locales, see the [Advanced Targeting Documentation](https://developers.facebook.com/docs/marketing-api/audiences/reference/advanced-targeting#additional)
-#' @section Parameters:
+#'
+#' ## ------------------------------
+#' __Parameters:__
 #' * Within parameters, vectors (`c()`) specify OR conditions and lists (`list()`) specify AND conditions. For example, `interests = c(6003349442621, 6003139266461)` will target users who are interested in either entertainment OR movies, while `interests = list(6003349442621, 6003139266461)` will target users who are interested in either entertainment AND movies.
-#' * Across parameters, OR conditions are used. For example, if enter `interests = 6003349442621` and `behaviors = 6008297697383` are specified, the function will query Facebook users interested in entertainment OR are frequent travelers.
-#' * And conditions across parameters can be specified using the `flex_target` argument.
+#' * Across parameters, AND conditions are used. For example, if enter `interests = 6003349442621` and `behaviors = 6008297697383` are specified, the function will query Facebook users interested in entertainment AND are frequent travelers.
+#' * Or conditions across parameters can be specified using the `flex_target` argument; see [package documentation](https://worldbank.github.io/rsocialwatcher/articles/rsocialwatcher-vignette.html#query_data_ids_andor_flex) for examples.
 #' @param interests Interest IDs. For example, `interests = c(6003349442621, 6003139266461)` will target users who are interested in either entertainment or movies. Use `get_fb_parameter_ids(type = "interests", ...)` to get dataframe with IDs and descriptions. For more information, see the [Basic Targeting Documentation](https://developers.facebook.com/docs/marketing-api/audiences/reference/basic-targeting#interests).
 #' @param behaviors Behavior IDs. For example, `behaviors = c(6002714895372, 6008297697383)` will target users who are either frequent travelers or returned from travels 2 weeks ago. Use `get_fb_parameter_ids(type = "behaviors", ...)` to get dataframe with IDs and descriptions. For more information, see the [Basic Targeting Documentation](https://developers.facebook.com/docs/marketing-api/audiences/reference/basic-targeting#behaviors).
 #' @param college_years College graduation years. For example, `college_years = c(2014, 2015)` will target users who graduated college in 2014 or 2015. For more information, see the [Advanced Targeting Documentation](https://developers.facebook.com/docs/marketing-api/audiences/reference/advanced-targeting#education_and_workplace).
@@ -832,7 +855,9 @@ query_fb_marketing_api_1call <- function(location_unit_type,
 #' @param relationship_statuses Relationship status IDs. For example, `relationship_statuses = c(3,4)` targets those who are married or engaged. Use `get_fb_parameter_ids(type = "relationship_statuses")` to get dataframe with IDs and descriptions. For more information, see the [Advanced Targeting Documentation](https://developers.facebook.com/docs/marketing-api/audiences/reference/advanced-targeting#demographic). 
 #' @param work_positions Work position IDs. For example, `work_positions = 105763692790962` will target users who indicate they are contractors. Use `get_fb_parameter_ids(type = "work_positions", ...)` to get dataframe with IDs and descriptions. For more information, see the [Advanced Targeting Documentation](https://developers.facebook.com/docs/marketing-api/audiences/reference/advanced-targeting#education_and_workplace).
 #' @param work_employers Work employer IDs. For example, `work_employers = 50431654` will target users who work for Microsoft. Use `get_fb_parameter_ids(type = "work_employers", ...)` to get dataframe with IDs and descriptions. For more information, see the [Advanced Targeting Documentation](https://developers.facebook.com/docs/marketing-api/audiences/reference/advanced-targeting#education_and_workplace).
-#' @section Exclude parameters
+#'
+#' ## ------------------------------
+#' __Exlcude Facebook users from query by select parameters__
 #' @param excl_interests Interest IDs to exclude.
 #' @param excl_behaviors Behavior IDs to exclude.
 #' @param excl_college_years Colleage year IDs to exclude.
@@ -846,7 +871,9 @@ query_fb_marketing_api_1call <- function(location_unit_type,
 #' @param excl_relationship_statuses Relationship status IDs to exclude.
 #' @param excl_work_positions Work position IDs to exclude.
 #' @param excl_work_employers Work employer IDs to exclude.
-#' @section Non-Flexible parameters:
+#'
+#' ## ------------------------------
+#' __Non-Flexible parameters:__
 #' * Across parameters, AND conditions are used. For example, if `gender = 1` and `age_min = 30`, queries users that are male AND are over 30 years old.
 #' * These parameters _cannot_ be specified in `flex_targeting`
 #' * Within parameters, vectors (`c()`) specify OR conditions. AND conditions cannot be specified within these parameters.
@@ -855,17 +882,25 @@ query_fb_marketing_api_1call <- function(location_unit_type,
 #' @param gender Genders to target; 1 targets males and 2 targets females. Default is both. See `gender` in the [Basic Targeting Documentation](https://developers.facebook.com/docs/marketing-api/audiences/reference/basic-targeting#demographics).
 #' @param age_min Minimum age. Default is 18. See `age_min` in the [Basic Targeting Documentation](https://developers.facebook.com/docs/marketing-api/audiences/reference/basic-targeting#demographics).
 #' @param age_max Maximum age. Default is 65. See `age_max` in the [Basic Targeting Documentation](https://developers.facebook.com/docs/marketing-api/audiences/reference/basic-targeting#demographics).
-#' @section Flex Targeting
-#' @param flex_target Flexible targeting allows for more complicated parameter specifications. For example, specifying AND conditions across parameter types (eg, behaviors and interests). For information on how to use flexible targeting, see [the documentation here](https://worldbank.github.io/rsocialwatcher/articles/rsocialwatcher-vignette.html#across-parameter-types-flexible-targetting).
-#' @section Credentials
+#'
+#' ## ------------------------------
+#' __Flex targeting parameters__
+#' @param flex_target Flexible targeting allows for more complicated parameter specifications. For example, specifying OR conditions across parameter types (eg, behaviors, interests, etc). For information on how to use flexible targeting, see [the documentation here](https://worldbank.github.io/rsocialwatcher/articles/rsocialwatcher-vignette.html#across-parameter-types-flexible-targetting).
+#'
+#' ## ------------------------------
+#' __Parameters for credentials__
 #' @param version API version. e.g., "v19.0"
 #' @param creation_act Facebook creation act
 #' @param token Facebook API token
-#' @section Scraping parameters
+#'
+#' ## ------------------------------
+#' __Scraping parameters__
 #' @param sleep_time How much time (in seconds) to pause between each query (default: `0.1`).
 #' @param show_result After each query, whether to print the number of monthly active users (default: `FALSE`).
 #' @param verbose Display messages that indicate the function is pausing before making additional queries. Pausing can result from API key rate limits or no internet (default: `TRUE`). 
-#' @section Return query text as variable in returned dataframe
+#'
+#' ## ------------------------------
+#' __Return query text__
 #' @param add_query If `TRUE`, add query text as variable in returned dataframe 
 #' @param add_query_hide_credentials If `TRUE` (and `add_query` is `TRUE`), hide the `creation_act` and `token` from the query text returned in the dataframe
 #' 
